@@ -1,7 +1,8 @@
-import { Controller } from '@nestjs/common';
+import { Controller, ParseUUIDPipe } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { CreateUserDto, LoginUserDto } from './dto';
+import { PaginationDto } from './common';
 
 
 @Controller()
@@ -21,13 +22,18 @@ export class AuthController {
 
 
   @MessagePattern('get.user')
-  getUser(@Payload() id: string) {
+  getUser(@Payload('id', ParseUUIDPipe) id: string) {
     return this.authService.getUser(id);
+  }
+
+  @MessagePattern('get.all.users')
+  getAllUsers(@Payload() paginationDto: PaginationDto) {
+    return this.authService.getAllUsers(paginationDto);
   }
 
 
   @MessagePattern('delete.user')
-  deleteUser(@Payload() id: string) {
+  deleteUser(@Payload('id', ParseUUIDPipe) id: string) {
     return this.authService.deleteUser(id);
   }
 

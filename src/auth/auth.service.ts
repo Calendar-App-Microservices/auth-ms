@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma-setup/prisma.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { JwtService } from '@nestjs/jwt';
 import { envs } from '../config';
-
+import { PaginationDto } from './common';
 
 @Injectable()
 export class AuthService {
@@ -46,7 +46,6 @@ export class AuthService {
     }
 
   }
-
 
   async createUser(createUserDto: CreateUserDto) {
 
@@ -128,9 +127,6 @@ export class AuthService {
     }
   }
 
-
-
-
   async getUser(id: string) {
     try {
       const user = await this.prisma.users.findUnique({
@@ -153,6 +149,36 @@ export class AuthService {
       });
     }
   }
+
+  async getAllUsers(paginationDto: PaginationDto) {
+
+    try {
+    const { page, limit } = paginationDto;
+
+    const totalPages = await this.prisma.users.count({where : { available: true} });
+    const lastPage = Math.ceil(totalPages / limit);
+    
+    return {
+      data: await this.prisma.users.findMany({
+        skip: (page - 1) * limit,
+        take: limit,
+        where: { available: true },
+        select: { name: true, email: true, available: true, createdAt: true }
+      }),
+      meta: {
+        total: totalPages,
+        page: page,
+        lastPage: lastPage,
+      }
+    }
+   } catch (error) {
+      throw new RpcException({
+        status: 400,
+        message: error.message,
+      });
+    }
+    }
+
 
   async updateUser(id: string, updateUserDto: UpdateUserDto) {
     const { email, name, password } = updateUserDto;
