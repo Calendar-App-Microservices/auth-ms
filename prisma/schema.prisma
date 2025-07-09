@@ -25,11 +25,13 @@ model Users {
   deletedAt   DateTime?
   available   Boolean     @default(true)
   verified    Boolean     @default(false)
+  createdBy   String?     @db.Uuid // ID del usuario que creó este usuario
+
+  creator     Users?      @relation("CreatedUsers", fields: [createdBy], references: [id])
+  createdUsers Users[]    @relation("CreatedUsers")
 
   @@map("users")
-
-
-  @@index([available]) // Index to quickly find available users
+                                     
 }
 
 

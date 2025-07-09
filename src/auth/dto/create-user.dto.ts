@@ -1,6 +1,6 @@
 
 import { Type } from "class-transformer";
-import { IsBoolean, IsDate, IsEmail, IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsDate, IsEmail, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 import { Roles} from '@prisma/client';
 
 export class CreateUserDto {
@@ -16,24 +16,13 @@ export class CreateUserDto {
     @MaxLength(50)
     password:string;
 
-    
     @IsEnum(Roles)
     @IsOptional()
     role?: Roles;
 
-    @IsDate()
-    @Type(() => Date)
-    @IsOptional()
-    updatedAt?: Date;
-
     @IsBoolean()
     @IsOptional()
     available?: boolean;
-  
-    @IsDate()
-    @Type(() => Date)
-    @IsOptional()
-    createdAt?: Date;
   
     @IsDate()
     @Type(() => Date)
