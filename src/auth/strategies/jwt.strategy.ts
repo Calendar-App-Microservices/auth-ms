@@ -34,6 +34,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     throw new UnauthorizedException('Token not valid');
   }
 
-  return user; // Retorna el usuario encontrado (automáticamente será adjuntado al request)
+  return {...user, verified: payload.verified}; // Retorna el usuario encontrado (automáticamente será adjuntado al request)
 }
 }

@@ -19,27 +19,20 @@ model Users {
   name        String
   email       String      @unique
   password    String
-  role        Roles       @default(USER)
+  role        Roles       @default(user)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime?   @updatedAt 
   deletedAt   DateTime?
   available   Boolean     @default(true)
-  verified    Boolean     @default(false)
-  createdBy   String?     @db.Uuid // ID del usuario que creó este usuario
-
-  creator     Users?      @relation("CreatedUsers", fields: [createdBy], references: [id])
-  createdUsers Users[]    @relation("CreatedUsers")
-
-  @@map("users")
-                                     
+  verified    Boolean     @default(false)              
+                            
 }
 
-
 enum Roles {
-  USER
-  ADMIN
-  SUPERUSER
-  PROFESSIONAL
+  user
+  admin
+  superuser
+  professional
 }
 
 

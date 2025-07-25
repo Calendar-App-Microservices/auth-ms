@@ -8,6 +8,9 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { JwtService } from '@nestjs/jwt';
 import { envs } from '../config';
 import { PaginationDto } from './common';
+import { MailService } from '../mail/mail.service';
+import { ConfigService } from '@nestjs/config';
+import { ConfirmAccountDto } from './dto/confirm-account.dto';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +20,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
+     private readonly configService: ConfigService,
   ) { }
 
 
@@ -27,7 +32,6 @@ export class AuthService {
 
   async verifyToken(token: string) {
     try {
-
       const { sub, iat, exp, ...user } = this.jwtService.verify(token, {
         secret: envs.jwtSecret,
       });
@@ -50,7 +54,6 @@ export class AuthService {
   async createUser(createUserDto: CreateUserDto) {
 
     try {
-
       const { password, ...userData } = createUserDto;
 
       const user = await this.prisma.users.findUnique({
@@ -69,8 +72,20 @@ export class AuthService {
         data: {
           ...userData,
           password: bcrypt.hashSync(password, 10), // Hash the password
+          verified: false, 
         },
       });
+
+          // Generar token de confirmación (JWT)
+      const confirmationToken = this.jwtService.sign(
+        { userId: newUser.id, purpose: 'confirm-account' },
+        { expiresIn: '1h' },
+      );
+
+
+      // Enviar correo de confirmación
+      const confirmLink = `${this.configService.get('frontendUrl')}/confirm?token=${confirmationToken}`;
+      await this.mailService.sendConfirmationEmail(newUser.email, confirmLink);
 
       const { password: __, ...rest } = newUser; // Exclude password from the response
       // Firma el token usando el id y otros datos relevantes
@@ -82,6 +97,49 @@ export class AuthService {
       throw new RpcException({
         status: 400,
         message: error.message,
+      });
+    }
+  }
+
+    async confirmAccount({ token }: ConfirmAccountDto) {
+    try {
+      // Validar el token JWT
+      const payload = this.jwtService.verify(token);
+      if (payload.purpose !== 'confirm-account') {
+        throw new RpcException({
+          status: 400,
+          message: 'Invalid token purpose',
+        });
+      }
+
+      // Buscar al usuario
+      const user = await this.prisma.users.findUnique({
+        where: { id: payload.userId },
+      });
+      if (!user) {
+        throw new RpcException({
+          status: 404,
+          message: 'User not found',
+        });
+      }
+      if (user.verified) {
+        throw new RpcException({
+          status: 400,
+          message: 'Account already verified',
+        });
+      }
+
+      // Marcar el usuario como verificado
+      await this.prisma.users.update({
+        where: { id: user.id },
+        data: { verified: true },
+      });
+
+      return { message: 'Account confirmed successfully' };
+    } catch (error) {
+      throw new RpcException({
+        status: 400,
+        message: error.message || 'Invalid or expired token',
       });
     }
   }
@@ -232,5 +290,83 @@ export class AuthService {
       });
     }
   }
+
+
+  /*
+
+    async forgotPassword({ email }: ForgotPasswordDto) {
+    const user = await this.prisma.users.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new RpcException({
+        status: 404,
+        message: 'User not found',
+      });
+    }
+
+    // Generar un token JWT
+    const token = jwt.sign(
+      { userId: user.id },
+      this.configService.get('JWT_SECRET'),
+      { expiresIn: '1h' },
+    );
+
+    // Guardar el token en la base de datos
+    await this.prisma.resetToken.create({
+      data: {
+        token,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
+      },
+    });
+
+    // Enviar correo con el enlace de restablecimiento
+    const resetLink = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${token}`;
+    await this.mailService.sendPasswordResetEmail(user.email, resetLink);
+
+    return { message: 'Password reset link sent' };
+  }*/
+
+    /*
+  async resetPassword({ token, password }: ResetPasswordDto) {
+    // Buscar el token en la base de datos
+    const resetToken = await this.prisma.resetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+      throw new RpcException({
+        status: 400,
+        message: 'Invalid or expired token',
+      });
+    }
+
+    // Validar el token JWT
+    try {
+      jwt.verify(token, this.configService.get('JWT_SECRET'));
+    } catch {
+      throw new RpcException({
+        status: 400,
+        message: 'Invalid token',
+      });
+    }
+
+    // Actualizar la contraseña
+    await this.prisma.users.update({
+      where: { id: resetToken.userId },
+      data: { password: bcrypt.hashSync(password, 10) },
+    });
+
+    // Marcar el token como usado
+    await this.prisma.resetToken.update({
+      where: { id: resetToken.id },
+      data: { used: true },
+    });
+
+    return { message: 'Password reset successfully' };
+  }*/
 
 }

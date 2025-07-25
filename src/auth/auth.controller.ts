@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { CreateUserDto, LoginUserDto } from './dto';
 import { PaginationDto } from './common';
+import { ConfirmAccountDto } from './dto/confirm-account.dto';
 
 
 @Controller()
@@ -15,6 +16,11 @@ export class AuthController {
     return this.authService.createUser(createUserDto);
   }
 
+  @MessagePattern('auth.confirm')
+  async confirmAccount(@Payload() confirmAccountDto: ConfirmAccountDto) {
+    return this.authService.confirmAccount(confirmAccountDto);
+  }
+  
  @MessagePattern('login.user')
   loginUser(@Payload() loginUserDto: LoginUserDto) {
     return this.authService.loginUser(loginUserDto);
@@ -41,6 +47,17 @@ export class AuthController {
   verifyToken(@Payload() token: string) {
     return this.authService.verifyToken(token);
   }
+/*
+  @MessagePattern('auth.forgot-password')
+  async forgotPassword(@Payload() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }*/
+
+    /*
+  @MessagePattern('auth.reset-password')
+  async resetPassword(@Payload() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
+  }*/
 
 
 
