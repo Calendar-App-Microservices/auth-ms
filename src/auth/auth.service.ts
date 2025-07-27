@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { CreateUserDto, LoginUserDto } from './dto';
 import * as bcrypt from 'bcrypt';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma-setup/prisma.service';
@@ -10,7 +9,7 @@ import { envs } from '../config';
 import { PaginationDto } from './common';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
-import { ConfirmAccountDto } from './dto/confirm-account.dto';
+import { CreateUserDto, ConfirmAccountDto, LoginUserDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 
 @Injectable()
 export class AuthService {
@@ -291,82 +290,81 @@ export class AuthService {
     }
   }
 
+ // CAMBIO de contraseña con clave antigua
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.users.findUnique({ where: { id: userId } });
+    if (!user) throw new RpcException({ status: 404, message: 'User not found' });
 
-  /*
+    const valid = await bcrypt.compare(dto.oldPassword, user.password);
+    if (!valid) throw new RpcException({ status: 400, message: 'Old password is incorrect' });
 
-    async forgotPassword({ email }: ForgotPasswordDto) {
-    const user = await this.prisma.users.findUnique({
-      where: { email },
-    });
+    if (dto.oldPassword === dto.newPassword)
+      throw new RpcException({ status: 400, message: 'New password must be different' });
 
-    if (!user) {
-      throw new RpcException({
-        status: 404,
-        message: 'User not found',
-      });
-    }
-
-    // Generar un token JWT
-    const token = jwt.sign(
-      { userId: user.id },
-      this.configService.get('JWT_SECRET'),
-      { expiresIn: '1h' },
-    );
-
-    // Guardar el token en la base de datos
-    await this.prisma.resetToken.create({
+    await this.prisma.users.update({
+      where: { id: userId },
       data: {
-        token,
-        userId: user.id,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
+        password: await bcrypt.hash(dto.newPassword, 10),
+        passwordChangedAt: new Date(),
       },
     });
 
-    // Enviar correo con el enlace de restablecimiento
-    const resetLink = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${token}`;
-    await this.mailService.sendPasswordResetEmail(user.email, resetLink);
+    return { message: 'Password changed successfully' };
+  }
 
-    return { message: 'Password reset link sent' };
-  }*/
-
-    /*
-  async resetPassword({ token, password }: ResetPasswordDto) {
-    // Buscar el token en la base de datos
-    const resetToken = await this.prisma.resetToken.findUnique({
-      where: { token },
-      include: { user: true },
-    });
-
-    if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
-      throw new RpcException({
-        status: 400,
-        message: 'Invalid or expired token',
-      });
+  // Enviar email de reset password
+  async forgotPassword({ email }: ForgotPasswordDto) {
+    const user = await this.prisma.users.findUnique({ where: { email } });
+    // Nunca revelar si el email existe
+    if (!user) {
+      return { message: 'If this email is registered, a password reset link will be sent.' };
     }
 
-    // Validar el token JWT
+    const token = this.jwtService.sign(
+      {
+        userId: user.id,
+        purpose: 'reset-password',
+      },
+      { expiresIn: '1h', secret: envs.jwtSecret }
+    );
+
+    const resetLink = `${envs.frontendUrl}/reset-password?token=${token}`;
+    this.mailService.sendPasswordResetEmail(user.email, resetLink)
+      .catch(e => this.logger.error('Error sending password reset email:', e));
+
+    return { message: 'If this email is registered, a password reset link will be sent.' };
+  }
+
+  // Reset de contraseña por token
+  async resetPassword({ token, newPassword }: ResetPasswordDto) {
+    let payload: any;
     try {
-      jwt.verify(token, this.configService.get('JWT_SECRET'));
-    } catch {
-      throw new RpcException({
-        status: 400,
-        message: 'Invalid token',
-      });
+      payload = this.jwtService.verify(token, { secret: envs.jwtSecret });
+    } catch (error) {
+      throw new RpcException({ status: 400, message: 'Invalid or expired token' });
     }
 
-    // Actualizar la contraseña
-    await this.prisma.users.update({
-      where: { id: resetToken.userId },
-      data: { password: bcrypt.hashSync(password, 10) },
-    });
+    if (payload.purpose !== 'reset-password') {
+      throw new RpcException({ status: 400, message: 'Invalid token purpose' });
+    }
 
-    // Marcar el token como usado
-    await this.prisma.resetToken.update({
-      where: { id: resetToken.id },
-      data: { used: true },
+    const user = await this.prisma.users.findUnique({ where: { id: payload.userId } });
+    if (!user) throw new RpcException({ status: 404, message: 'User not found' });
+
+    // Extra seguridad: token ya no válido si password fue cambiada después de su emisión
+    if (user.passwordChangedAt && payload.iat * 1000 < user.passwordChangedAt.getTime()) {
+      throw new RpcException({ status: 400, message: 'Token is no longer valid (password was already changed).' });
+    }
+
+    await this.prisma.users.update({
+      where: { id: user.id },
+      data: {
+        password: await bcrypt.hash(newPassword, 10),
+        passwordChangedAt: new Date(),
+      },
     });
 
     return { message: 'Password reset successfully' };
-  }*/
+  }
 
 }

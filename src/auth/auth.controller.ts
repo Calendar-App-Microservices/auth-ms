@@ -1,9 +1,9 @@
 import { Controller, ParseUUIDPipe } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { CreateUserDto, LoginUserDto } from './dto';
 import { PaginationDto } from './common';
-import { ConfirmAccountDto } from './dto/confirm-account.dto';
+import { CreateUserDto, ConfirmAccountDto, LoginUserDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
+
 
 
 @Controller()
@@ -47,19 +47,21 @@ export class AuthController {
   verifyToken(@Payload() token: string) {
     return this.authService.verifyToken(token);
   }
-/*
+
+  @MessagePattern('auth.change-password')
+  async changePassword(@Payload() data: { userId: string, dto: ChangePasswordDto }) {
+    return this.authService.changePassword(data.userId, data.dto);
+  }
+
   @MessagePattern('auth.forgot-password')
   async forgotPassword(@Payload() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
-  }*/
+  }
 
-    /*
   @MessagePattern('auth.reset-password')
   async resetPassword(@Payload() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
-  }*/
-
-
+  }
 
 
 }

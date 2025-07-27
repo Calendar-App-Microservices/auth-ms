@@ -28,6 +28,7 @@ export class MailService {
     });
   }
 
+
     async sendConfirmationEmail(to: string, confirmLink: string) {
     try {
     await this.transporter.sendMail({
@@ -46,5 +47,25 @@ export class MailService {
     throw new Error('Failed to send confirmation email');
   }
   }
+
+
+  async sendPasswordResetEmail(to: string, resetLink: string) {
+  try {
+    await this.transporter.sendMail({
+      from: `"Your App" <${envs.mailUser}>`,
+      to,
+      subject: 'Reset Your Password',
+      html: `
+        <h2>Password Reset Request</h2>
+        <p>Click the link below to reset your password. This link will expire in 1 hour:</p>
+        <a href="${resetLink}">Reset Password</a>
+      `,
+    });
+  } catch (error) {
+    this.logger.error('Error sending password reset email:', error);
+  }
+}
+
+
 
 }
